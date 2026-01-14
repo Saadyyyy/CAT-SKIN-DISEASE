@@ -253,7 +253,7 @@ with tab4:
     st.header("Prediction App")
     
     if model is None:
-        st.error("⚠️ Model tidak ditemukan! Pastikan file model (.keras atau .h5) ada di folder yang sama.")
+        st.error("⚠️ Model tidak ditemukan! Pastikan file model (.keras atau .h5) ada di folder yang sama dengan aplikasi ini.")
     else:
         st.success("✅ Model Ready")
         
