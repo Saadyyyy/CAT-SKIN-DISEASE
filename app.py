@@ -77,59 +77,50 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # --- Load Model Logic (Cached) ---
-MODEL_PATH = 'cat_skin_disease_model_final.h5'
+MODEL_CANDIDATES = ['best_model.keras', 'cat_skin_disease_model_final.h5']
 
 @st.cache_resource
 def load_model():
-    if not os.path.exists(MODEL_PATH):
-        return None
-    try:
-        # Mencoba load dengan compile=False untuk kompatibilitas Keras 3/TF 2.16+
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        return model
-    except Exception as e:
-        # Fallback: Reconstruct model architecture and load weights
-        # Ini berguna jika terjadi error layer mismatch pada Keras 3
-        try:
-            st.warning(f"Standard loading failed ({e}), attempting to reconstruct model...")
-            
-            img_height = 224
-            img_width = 224
-            num_classes = 4
-
-            # Recreate Data Augmentation (Must match original structure)
-            data_augmentation = tf.keras.Sequential([
-                tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
-                tf.keras.layers.RandomRotation(0.1),
-                tf.keras.layers.RandomZoom(0.1),
-            ])
-
-            # Recreate Base Model (MobileNetV2)
-            base_model = tf.keras.applications.MobileNetV2(
-                input_shape=(img_height, img_width, 3),
-                include_top=False,
-                weights=None # Load from file later
-            )
-            base_model.trainable = False
-
-            # Recreate Main Model
-            model = tf.keras.Sequential([
-                data_augmentation,
-                tf.keras.layers.Rescaling(1./127.5, offset=-1),
-                base_model,
-                tf.keras.layers.GlobalAveragePooling2D(),
-                tf.keras.layers.Dropout(0.2),
-                tf.keras.layers.Dense(num_classes, activation='softmax')
-            ])
-            
-            # Load weights
-            model.load_weights(MODEL_PATH)
-            return model
-            
-        except Exception as e_reconstruct:
-            st.error(f"Error loading model: {e_reconstruct}")
-            st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
-            return None
+    for path in MODEL_CANDIDATES:
+        if os.path.exists(path):
+            try:
+                return tf.keras.models.load_model(path, compile=False)
+            except Exception as e:
+                if path.endswith(".h5"):
+                    try:
+                        img_height = 224
+                        img_width = 224
+                        num_classes = 4
+                        data_augmentation = tf.keras.Sequential([
+                            tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
+                            tf.keras.layers.RandomRotation(0.1),
+                            tf.keras.layers.RandomZoom(0.1),
+                        ])
+                        base_model = tf.keras.applications.MobileNetV2(
+                            input_shape=(img_height, img_width, 3),
+                            include_top=False,
+                            weights=None
+                        )
+                        base_model.trainable = False
+                        m = tf.keras.Sequential([
+                            data_augmentation,
+                            tf.keras.layers.Rescaling(1./127.5, offset=-1),
+                            base_model,
+                            tf.keras.layers.GlobalAveragePooling2D(),
+                            tf.keras.layers.Dropout(0.2),
+                            tf.keras.layers.Dense(num_classes, activation='softmax')
+                        ])
+                        m.load_weights(path)
+                        return m
+                    except Exception as e2:
+                        st.error(f"Error loading model: {e2}")
+                        st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
+                        return None
+                else:
+                    st.error(f"Error loading model: {e}")
+                    st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
+                    return None
+    return None
 
 model = load_model()
 
@@ -323,4 +314,3 @@ with tab5:
     st.text_input("Email")
     st.text_area("Pesan")
     st.button("Kirim Pesan")
-
