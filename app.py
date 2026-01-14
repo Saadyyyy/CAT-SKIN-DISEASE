@@ -88,9 +88,48 @@ def load_model():
         model = tf.keras.models.load_model(MODEL_PATH, compile=False)
         return model
     except Exception as e:
-        st.error(f"Error loading model: {e}")
-        st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
-        return None
+        # Fallback: Reconstruct model architecture and load weights
+        # Ini berguna jika terjadi error layer mismatch pada Keras 3
+        try:
+            st.warning(f"Standard loading failed ({e}), attempting to reconstruct model...")
+            
+            img_height = 224
+            img_width = 224
+            num_classes = 4
+
+            # Recreate Data Augmentation (Must match original structure)
+            data_augmentation = tf.keras.Sequential([
+                tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
+                tf.keras.layers.RandomRotation(0.1),
+                tf.keras.layers.RandomZoom(0.1),
+            ])
+
+            # Recreate Base Model (MobileNetV2)
+            base_model = tf.keras.applications.MobileNetV2(
+                input_shape=(img_height, img_width, 3),
+                include_top=False,
+                weights=None # Load from file later
+            )
+            base_model.trainable = False
+
+            # Recreate Main Model
+            model = tf.keras.Sequential([
+                data_augmentation,
+                tf.keras.layers.Rescaling(1./127.5, offset=-1),
+                base_model,
+                tf.keras.layers.GlobalAveragePooling2D(),
+                tf.keras.layers.Dropout(0.2),
+                tf.keras.layers.Dense(num_classes, activation='softmax')
+            ])
+            
+            # Load weights
+            model.load_weights(MODEL_PATH)
+            return model
+            
+        except Exception as e_reconstruct:
+            st.error(f"Error loading model: {e_reconstruct}")
+            st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
+            return None
 
 model = load_model()
 
