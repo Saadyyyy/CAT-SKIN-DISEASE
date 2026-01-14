@@ -1,5 +1,5 @@
-tensorflow<2.16; sys_platform != 'darwin'
-tensorflow-macos<2.16; sys_platform == 'darwin'
+tensorflow==2.20.0; sys_platform != 'darwin'
+tensorflow-macos>=2.13; sys_platform == 'darwin'
 pandas
 numpy
 matplotlib

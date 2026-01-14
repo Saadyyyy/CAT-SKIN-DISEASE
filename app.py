@@ -77,13 +77,24 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # --- Load Model Logic (Cached) ---
-MODEL_PATH = 'cat_skin_disease_model_final.h5'
+MODEL_PATH = 'best_model.keras'
 
 @st.cache_resource
 def load_model():
-    if not os.path.exists(MODEL_PATH):
-        return None
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model_path = MODEL_PATH
+    if not os.path.exists(model_path):
+        # Fallback to .h5 if .keras not found
+        model_path = 'cat_skin_disease_model_final.h5'
+        if not os.path.exists(model_path):
+            return None
+    
+    # Load model with Keras 3 compatible flags
+    try:
+        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+    except:
+        # Retry with standard load if flags fail (for older TF versions)
+        model = tf.keras.models.load_model(model_path, compile=False)
+        
     return model
 
 model = load_model()
@@ -278,4 +289,3 @@ with tab5:
     st.text_input("Email")
     st.text_area("Pesan")
     st.button("Kirim Pesan")
-
