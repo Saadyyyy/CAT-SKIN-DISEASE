@@ -1,5 +1,5 @@
-tensorflow-macos
-tensorflow-metal
+tensorflow; sys_platform != 'darwin'
+tensorflow-macos; sys_platform == 'darwin'
 pandas
 numpy
 matplotlib
