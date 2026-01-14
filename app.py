@@ -79,8 +79,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # --- Load Model Logic (Cached) ---
 @st.cache_resource
 def load_model():
-    # Daftar prioritas file model
-    # Prioritaskan .keras karena lebih kompatibel dengan TensorFlow terbaru/Keras 3
     model_files = ['best_model.keras', 'cat_skin_disease_model_final.h5']
     model_path = None
     
@@ -93,52 +91,44 @@ def load_model():
         return None
         
     try:
-        # Mencoba load dengan compile=False untuk kompatibilitas
-        model = tf.keras.models.load_model(model_path, compile=False)
+        if model_path.endswith(".keras"):
+            model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+        else:
+            model = tf.keras.models.load_model(model_path, compile=False)
         return model
     except Exception as e:
-        # Fallback: Reconstruct model architecture and load weights
-        # Ini berguna jika terjadi error layer mismatch pada Keras 3
         try:
-            st.warning(f"Standard loading failed ({e}), attempting to reconstruct model from {model_path}...")
-            
-            img_height = 224
-            img_width = 224
-            num_classes = 4
-
-            # Recreate Data Augmentation (Must match original structure)
-            data_augmentation = tf.keras.Sequential([
-                tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
-                tf.keras.layers.RandomRotation(0.1),
-                tf.keras.layers.RandomZoom(0.1),
-            ])
-
-            # Recreate Base Model (MobileNetV2)
-            base_model = tf.keras.applications.MobileNetV2(
-                input_shape=(img_height, img_width, 3),
-                include_top=False,
-                weights=None # Load from file later
-            )
-            base_model.trainable = False
-
-            # Recreate Main Model
-            model = tf.keras.Sequential([
-                data_augmentation,
-                tf.keras.layers.Rescaling(1./127.5, offset=-1),
-                base_model,
-                tf.keras.layers.GlobalAveragePooling2D(),
-                tf.keras.layers.Dropout(0.2),
-                tf.keras.layers.Dense(num_classes, activation='softmax')
-            ])
-            
-            # Load weights
-            # Note: skip_mismatch=True and by_name=True can help if there are minor graph differences
-            model.load_weights(model_path, skip_mismatch=True, by_name=True)
-            return model
-            
+            if model_path.endswith(".h5") or model_path.endswith(".hdf5"):
+                st.warning(f"Standard loading failed ({e}), attempting to reconstruct model from {model_path}...")
+                img_height = 224
+                img_width = 224
+                num_classes = 4
+                data_augmentation = tf.keras.Sequential([
+                    tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
+                    tf.keras.layers.RandomRotation(0.1),
+                    tf.keras.layers.RandomZoom(0.1),
+                ])
+                base_model = tf.keras.applications.MobileNetV2(
+                    input_shape=(img_height, img_width, 3),
+                    include_top=False,
+                    weights='imagenet'
+                )
+                base_model.trainable = False
+                model = tf.keras.Sequential([
+                    data_augmentation,
+                    tf.keras.layers.Rescaling(1./127.5, offset=-1),
+                    base_model,
+                    tf.keras.layers.GlobalAveragePooling2D(),
+                    tf.keras.layers.Dropout(0.2),
+                    tf.keras.layers.Dense(num_classes, activation='softmax')
+                ])
+                model.load_weights(model_path, skip_mismatch=True, by_name=True)
+                return model
+            else:
+                st.error(f"Error loading model: {e}")
+                return None
         except Exception as e_reconstruct:
             st.error(f"Error loading model: {e_reconstruct}")
-            st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
             return None
 
 model = load_model()
@@ -272,7 +262,12 @@ with tab4:
     st.header("Prediction App")
     
     if model is None:
-        st.error("⚠️ Model tidak ditemukan! Pastikan file model (.keras atau .h5) ada di folder yang sama dengan aplikasi ini.")
+        found = [f for f in ['best_model.keras', 'cat_skin_disease_model_final.h5'] if os.path.exists(f)]
+        if found:
+            st.error(f"⚠️ Model terdeteksi namun gagal dimuat: {found}.")
+            st.warning("Gunakan file .keras yang diexport dengan Keras 3, atau .h5 dari Keras 2 yang kompatibel.")
+        else:
+            st.error("⚠️ Model tidak ditemukan! Pastikan file model (.keras atau .h5) ada di folder yang sama.")
     else:
         st.success("✅ Model Ready")
         
