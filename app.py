@@ -88,14 +88,41 @@ def load_model():
         if not os.path.exists(model_path):
             return None
     
-    # Load model with Keras 3 compatible flags
     try:
-        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
-    except:
-        # Retry with standard load if flags fail (for older TF versions)
-        model = tf.keras.models.load_model(model_path, compile=False)
-        
-    return model
+        # Try loading the full model first (works for .keras usually)
+        return tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+    except Exception as e:
+        # Fallback: Rebuild architecture and load weights (most robust for .h5 across versions)
+        try:
+            from tensorflow.keras.applications import MobileNetV2
+            from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout, Rescaling
+            from tensorflow.keras.models import Sequential
+
+            # Recreate the exact architecture used in training
+            img_height, img_width = 224, 224
+            num_classes = 4
+            
+            base_model = MobileNetV2(
+                input_shape=(img_height, img_width, 3),
+                include_top=False,
+                weights='imagenet'
+            )
+            base_model.trainable = False 
+            
+            model = Sequential([
+                Rescaling(1./127.5, offset=-1, input_shape=(img_height, img_width, 3)),
+                base_model,
+                GlobalAveragePooling2D(),
+                Dropout(0.2),
+                Dense(num_classes, activation='softmax')
+            ])
+            
+            # Load weights
+            model.load_weights(model_path)
+            return model
+        except Exception as e2:
+            st.error(f"Error loading model: {e2}")
+            return None
 
 model = load_model()
 
