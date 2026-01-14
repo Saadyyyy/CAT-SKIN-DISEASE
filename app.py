@@ -77,59 +77,14 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # --- Load Model Logic (Cached) ---
+MODEL_PATH = 'cat_skin_disease_model_final.h5'
+
 @st.cache_resource
 def load_model():
-    model_files = ['best_model.keras', 'cat_skin_disease_model_final.h5']
-    model_path = None
-    
-    for f in model_files:
-        if os.path.exists(f):
-            model_path = f
-            break
-            
-    if not model_path:
+    if not os.path.exists(MODEL_PATH):
         return None
-        
-    try:
-        if model_path.endswith(".keras"):
-            model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
-        else:
-            model = tf.keras.models.load_model(model_path, compile=False)
-        return model
-    except Exception as e:
-        try:
-            if model_path.endswith(".h5") or model_path.endswith(".hdf5"):
-                st.warning(f"Standard loading failed ({e}), attempting to reconstruct model from {model_path}...")
-                img_height = 224
-                img_width = 224
-                num_classes = 4
-                data_augmentation = tf.keras.Sequential([
-                    tf.keras.layers.RandomFlip("horizontal", input_shape=(img_height, img_width, 3)),
-                    tf.keras.layers.RandomRotation(0.1),
-                    tf.keras.layers.RandomZoom(0.1),
-                ])
-                base_model = tf.keras.applications.MobileNetV2(
-                    input_shape=(img_height, img_width, 3),
-                    include_top=False,
-                    weights='imagenet'
-                )
-                base_model.trainable = False
-                model = tf.keras.Sequential([
-                    data_augmentation,
-                    tf.keras.layers.Rescaling(1./127.5, offset=-1),
-                    base_model,
-                    tf.keras.layers.GlobalAveragePooling2D(),
-                    tf.keras.layers.Dropout(0.2),
-                    tf.keras.layers.Dense(num_classes, activation='softmax')
-                ])
-                model.load_weights(model_path, skip_mismatch=True, by_name=True)
-                return model
-            else:
-                st.error(f"Error loading model: {e}")
-                return None
-        except Exception as e_reconstruct:
-            st.error(f"Error loading model: {e_reconstruct}")
-            return None
+    model = tf.keras.models.load_model(MODEL_PATH)
+    return model
 
 model = load_model()
 
@@ -262,12 +217,7 @@ with tab4:
     st.header("Prediction App")
     
     if model is None:
-        found = [f for f in ['best_model.keras', 'cat_skin_disease_model_final.h5'] if os.path.exists(f)]
-        if found:
-            st.error(f"⚠️ Model terdeteksi namun gagal dimuat: {found}.")
-            st.warning("Gunakan file .keras yang diexport dengan Keras 3, atau .h5 dari Keras 2 yang kompatibel.")
-        else:
-            st.error("⚠️ Model tidak ditemukan! Pastikan file model (.keras atau .h5) ada di folder yang sama.")
+        st.error(f"⚠️ Model tidak ditemukan! Harap letakkan file **{MODEL_PATH}** di folder yang sama.")
     else:
         st.success("✅ Model Ready")
         
@@ -328,3 +278,4 @@ with tab5:
     st.text_input("Email")
     st.text_area("Pesan")
     st.button("Kirim Pesan")
+
