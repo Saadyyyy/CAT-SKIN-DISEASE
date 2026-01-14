@@ -83,8 +83,14 @@ MODEL_PATH = 'cat_skin_disease_model_final.h5'
 def load_model():
     if not os.path.exists(MODEL_PATH):
         return None
-    model = tf.keras.models.load_model(MODEL_PATH)
-    return model
+    try:
+        # Mencoba load dengan compile=False untuk kompatibilitas Keras 3/TF 2.16+
+        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        st.warning("Jika Anda menggunakan Python 3.12+ atau TensorFlow 2.16+, model .h5 legacy mungkin mengalami masalah kompatibilitas.")
+        return None
 
 model = load_model()
 
